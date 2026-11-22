@@ -1,0 +1,293 @@
+name: PakePlus Android APK Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Build Tools & Platform
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Generate Android WebView Project from ppconfig.json
+        run: |
+          python3 - << 'PYEOF'
+          import json, os, re, shutil
+
+          cfg_path = "scripts/ppconfig.json"
+          cfg = {}
+          if os.path.exists(cfg_path):
+              with open(cfg_path, "r", encoding="utf-8") as f:
+                  cfg = json.load(f)
+
+          raw_name = cfg.get("showName") or cfg.get("name") or "PakePlusApp"
+          safe_file_name = re.sub(r"[^A-Za-z0-9._-]+", "_", raw_name).strip("_") or "PakePlusApp"
+          app_id = cfg.get("appid") or "com.pakeplus.webapp"
+          version_name = str(cfg.get("version") or "1.0.0")
+          web_url = cfg.get("url") or "https://example.com"
+          is_html = bool(cfg.get("isHtml", False))
+          filter_css = cfg.get("filterCss") or ""
+          custom_js = cfg.get("customJs") or ""
+          if not custom_js and os.path.exists("scripts/config/inject/custom.js"):
+              with open("scripts/config/inject/custom.js", "r", encoding="utf-8") as f:
+                  custom_js = f.read()
+
+          phone = cfg.get("phone") or {}
+          header = phone.get("header") or {}
+          webview_cfg = phone.get("webview") or {}
+          user_agent = webview_cfg.get("userAgent") or ""
+          js_enabled = bool(webview_cfg.get("javaScriptEnabled", True))
+          dom_storage = bool(webview_cfg.get("domStorageEnabled", True))
+          zoom_enabled = bool(webview_cfg.get("setSupportZoom", True))
+          clear_cache = bool(webview_cfg.get("clearCache", False))
+          show_header = bool(header.get("show", False))
+          header_title = header.get("title") or raw_name
+          header_bg = header.get("backgroundColor") or "#4F46E5"
+          header_fg = header.get("color") or "#FFFFFF"
+
+          root = "android_build"
+          pkg_dir = os.path.join(root, "app/src/main/java/com/pakeplus/host")
+          res_val_dir = os.path.join(root, "app/src/main/res/values")
+          assets_dir = os.path.join(root, "app/src/main/assets")
+          www_dir = os.path.join(assets_dir, "www")
+          for d in [pkg_dir, res_val_dir, assets_dir, www_dir]:
+              os.makedirs(d, exist_ok=True)
+
+          with open(os.path.join(root, "settings.gradle"), "w", encoding="utf-8") as f:
+              f.write('pluginManagement {\n  repositories {\n    google()\n    mavenCentral()\n    gradlePluginPortal()\n  }\n}\ndependencyResolutionManagement {\n  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n  repositories {\n    google()\n    mavenCentral()\n  }\n}\nrootProject.name = "PakePlusBuild"\ninclude(":app")\n')
+
+          with open(os.path.join(root, "build.gradle"), "w", encoding="utf-8") as f:
+              f.write('plugins {\n  id "com.android.application" version "8.5.2" apply false\n  id "org.jetbrains.kotlin.android" version "1.9.24" apply false\n}\n')
+
+          with open(os.path.join(root, "gradle.properties"), "w", encoding="utf-8") as f:
+              f.write("android.useAndroidX=true\norg.gradle.jvmargs=-Xmx2048m\n")
+
+          with open(os.path.join(root, "app/build.gradle"), "w", encoding="utf-8") as f:
+              f.write(f'''plugins {{
+            id "com.android.application"
+            id "org.jetbrains.kotlin.android"
+          }}
+          android {{
+            namespace "com.pakeplus.host"
+            compileSdk 34
+            defaultConfig {{
+              applicationId "{app_id}"
+              minSdk 24
+              targetSdk 34
+              versionCode 1
+              versionName "{version_name}"
+            }}
+            compileOptions {{
+              sourceCompatibility JavaVersion.VERSION_17
+              targetCompatibility JavaVersion.VERSION_17
+            }}
+            kotlinOptions {{
+              jvmTarget = "17"
+            }}
+          }}
+          dependencies {{
+            implementation "androidx.core:core-ktx:1.13.1"
+            implementation "androidx.appcompat:appcompat:1.7.0"
+          }}
+          ''')
+
+          xml_name = raw_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+          with open(os.path.join(res_val_dir, "strings.xml"), "w", encoding="utf-8") as f:
+              f.write(f'<resources><string name="app_name">{xml_name}</string></resources>\n')
+
+          with open(os.path.join(root, "app/src/main/AndroidManifest.xml"), "w", encoding="utf-8") as f:
+              f.write('''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            <application
+              android:label="@string/app_name"
+              android:usesCleartextTraffic="true"
+              android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+              <activity android:name=".MainActivity" android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          ''')
+
+          with open(os.path.join(assets_dir, "custom.js"), "w", encoding="utf-8") as f:
+              f.write(custom_js)
+
+          if os.path.exists("scripts/config/www/index.html"):
+              shutil.copyfile("scripts/config/www/index.html", os.path.join(www_dir, "index.html"))
+          else:
+              with open(os.path.join(www_dir, "index.html"), "w", encoding="utf-8") as f:
+                  f.write("<html><body><h1>PakePlus App</h1></body></html>")
+
+          def k_escape(s):
+              return (
+                  s.replace("\\", "\\\\")
+                  .replace('"', '\\"')
+                  .replace("$", "\\$")
+                  .replace("\n", "\\n")
+                  .replace("\r", "")
+              )
+
+          target_url = "file:///android_asset/www/index.html" if is_html else web_url
+          main_kt = f'''package com.pakeplus.host
+
+          import android.annotation.SuppressLint
+          import android.graphics.Color
+          import android.os.Bundle
+          import android.view.Gravity
+          import android.view.View
+          import android.view.ViewGroup
+          import android.webkit.WebChromeClient
+          import android.webkit.WebSettings
+          import android.webkit.WebView
+          import android.webkit.WebViewClient
+          import android.widget.LinearLayout
+          import android.widget.ProgressBar
+          import android.widget.TextView
+          import androidx.activity.OnBackPressedCallback
+          import androidx.appcompat.app.AppCompatActivity
+
+          class MainActivity : AppCompatActivity() {{
+              private lateinit var webView: WebView
+
+              @SuppressLint("SetJavaScriptEnabled")
+              override fun onCreate(savedInstanceState: Bundle?) {{
+                  super.onCreate(savedInstanceState)
+                  val root = LinearLayout(this).apply {{
+                      orientation = LinearLayout.VERTICAL
+                      fitsSystemWindows = true
+                      layoutParams = ViewGroup.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT,
+                          ViewGroup.LayoutParams.MATCH_PARENT
+                      )
+                  }}
+                  if ({str(show_header).lower()}) {{
+                      val bar = TextView(this).apply {{
+                          text = "{k_escape(header_title)}"
+                          textSize = 18f
+                          setPadding(36, 32, 36, 32)
+                          gravity = Gravity.CENTER_VERTICAL
+                          setBackgroundColor(runCatching {{ Color.parseColor("{k_escape(header_bg)}") }}.getOrDefault(Color.DKGRAY))
+                          setTextColor(runCatching {{ Color.parseColor("{k_escape(header_fg)}") }}.getOrDefault(Color.WHITE))
+                      }}
+                      root.addView(bar)
+                  }}
+                  val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {{
+                      max = 100
+                      layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 8)
+                  }}
+                  root.addView(progress)
+                  webView = WebView(this).apply {{
+                      layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                  }}
+                  root.addView(webView)
+                  setContentView(root)
+
+                  val customJs = runCatching {{ assets.open("custom.js").bufferedReader().readText() }}.getOrDefault("")
+                  val filterCss = "{k_escape(filter_css)}"
+
+                  with(webView.settings) {{
+                      javaScriptEnabled = {str(js_enabled).lower()}
+                      domStorageEnabled = {str(dom_storage).lower()}
+                      allowFileAccess = true
+                      setSupportZoom({str(zoom_enabled).lower()})
+                      builtInZoomControls = {str(zoom_enabled).lower()}
+                      displayZoomControls = false
+                      mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                      val customUa = "{k_escape(user_agent)}"
+                      if (customUa.isNotBlank()) userAgentString = customUa
+                  }}
+                  if ({str(clear_cache).lower()}) webView.clearCache(true)
+
+                  webView.webChromeClient = object : WebChromeClient() {{
+                      override fun onProgressChanged(view: WebView?, newProgress: Int) {{
+                          progress.progress = newProgress
+                          progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
+                      }}
+                  }}
+                  webView.webViewClient = object : WebViewClient() {{
+                      override fun onPageFinished(view: WebView?, url: String?) {{
+                          super.onPageFinished(view, url)
+                          if (filterCss.isNotBlank()) {{
+                              val safeCss = filterCss.replace("'", "\\\\'")
+                              val cssJs = "(function(){{var s=document.createElement('style');s.textContent='" + safeCss + " {{ display:none !important; }}';(document.head||document.documentElement).appendChild(s);}})();"
+                              view?.evaluateJavascript(cssJs, null)
+                          }}
+                          if (customJs.isNotBlank()) {{
+                              view?.evaluateJavascript(customJs, null)
+                          }}
+                      }}
+                  }}
+
+                  onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {{
+                      override fun handleOnBackPressed() {{
+                          if (webView.canGoBack()) webView.goBack() else finish()
+                      }}
+                  }})
+
+                  webView.loadUrl("{k_escape(target_url)}")
+              }}
+          }}
+          '''
+          with open(os.path.join(pkg_dir, "MainActivity.kt"), "w", encoding="utf-8") as f:
+              f.write(main_kt)
+
+          apk_name = f"{safe_file_name}-v{version_name}.apk"
+          gh_env = os.environ.get("GITHUB_ENV")
+          if gh_env:
+              with open(gh_env, "a", encoding="utf-8") as f:
+                  f.write(f"APK_NAME={apk_name}\n")
+                  f.write(f"APK_PATH=dist/{apk_name}\n")
+                  f.write(f"APP_TITLE={raw_name}\n")
+                  f.write(f"APP_VERSION={version_name}\n")
+          PYEOF
+
+      - name: Build Android APK
+        working-directory: android_build
+        run: gradle assembleDebug --no-daemon
+
+      - name: Prepare APK Output
+        run: |
+          mkdir -p dist
+          cp android_build/app/build/outputs/apk/debug/app-debug.apk "${{ env.APK_PATH }}"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_PATH }}
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${APP_VERSION}-build-${{ github.run_number }}"
+          gh release create "$TAG" "${{ env.APK_PATH }}" \
+            --title "${APP_TITLE} v${APP_VERSION}" \
+            --notes "Automated Android APK build triggered via PakePlus (branch: ${{ github.ref_name }})."
