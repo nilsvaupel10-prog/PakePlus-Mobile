@@ -2,16 +2,22 @@
 use crate::command::cmds::{get_config_js, get_exe_dir, get_www_dir, load_man};
 #[cfg(desktop)]
 use base64::{prelude::BASE64_STANDARD, Engine};
+#[cfg(desktop)]
 use serde::{Deserialize, Serialize};
 use serde_json::Error;
 #[cfg(desktop)]
 use serde_json::{json, Value};
-use tauri::{utils::config::WindowConfig, App, Manager};
+#[cfg(desktop)]
+use tauri::utils::config::WindowConfig;
+use tauri::{App, Manager};
 #[cfg(desktop)]
 use tauri::{Url, WebviewUrl, WindowEvent};
 #[cfg(desktop)]
 use tauri_plugin_store::StoreExt;
 
+/// The configuration of a packaged project, it is only read on desktop
+/// platforms where the window of the project is created at runtime.
+#[cfg(desktop)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Man {
     pub name: String,
@@ -24,11 +30,15 @@ pub struct Man {
     pub icon: String,
 }
 
+/// Appends the arguments of the command line to an url.
+#[cfg(desktop)]
 pub fn append_param(original_url: &str, value: &str) -> String {
     let separator = if original_url.contains('?') { "&" } else { "?" };
     format!("{}{}args={}", original_url, separator, url_encode(value))
 }
 
+/// Encodes a string so that it can be used as the value of a query parameter.
+#[cfg(desktop)]
 pub fn url_encode(input: &str) -> String {
     input
         .bytes()
