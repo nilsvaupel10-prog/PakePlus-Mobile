@@ -1,0 +1,111 @@
+{
+    "$schema": "../gen/schemas/mobile-schema.json",
+    "identifier": "mobile-capability",
+    "description": "Capability for the main webview on Android and iOS",
+    "windows": [
+        "main",
+        "PreView",
+        "*"
+    ],
+    "platforms": [
+        "android",
+        "iOS"
+    ],
+    "remote": {
+        "urls": [
+            "https://*:*",
+            "file://*",
+            "http://*:*",
+            "asset://localhost/*"
+        ]
+    },
+    "permissions": [
+        "core:default",
+        "core:window:default",
+        "core:app:default",
+        "core:event:default",
+        "core:webview:default",
+        "core:path:default",
+        "core:resources:default",
+        "core:window:allow-set-focus",
+        "core:window:allow-show",
+        "core:app:allow-app-hide",
+        "core:app:allow-app-show",
+        "core:app:allow-set-app-theme",
+        "core:app:allow-name",
+        "core:event:allow-emit",
+        "core:event:allow-listen",
+        "core:webview:allow-create-webview",
+        "core:webview:allow-create-webview-window",
+        "core:webview:allow-clear-all-browsing-data",
+        "core:webview:allow-get-all-webviews",
+        "core:webview:allow-internal-toggle-devtools",
+        "core:webview:allow-set-webview-zoom",
+        "core:webview:allow-set-webview-background-color",
+        "core:webview:allow-set-webview-position",
+        "core:webview:allow-set-webview-focus",
+        "core:webview:allow-set-webview-size",
+        "process:default",
+        "process:allow-restart",
+        "process:allow-exit",
+        "http:allow-fetch",
+        "http:default",
+        "http:allow-fetch-cancel",
+        "http:allow-fetch-read-body",
+        "http:allow-fetch-cancel-body",
+        "http:allow-fetch-send",
+        "dialog:default",
+        "dialog:allow-open",
+        "dialog:allow-ask",
+        "dialog:allow-confirm",
+        "dialog:allow-message",
+        "os:allow-locale",
+        "os:allow-hostname",
+        "store:default",
+        "clipboard-manager:allow-write-text",
+        {
+            "identifier": "http:default",
+            "allow": [
+                {
+                    "url": "https://*:*"
+                },
+                {
+                    "url": "file://*:*"
+                },
+                {
+                    "url": "http://*:*"
+                },
+                {
+                    "url": "asset://localhost/*"
+                }
+            ]
+        },
+        {
+            "identifier": "fs:scope",
+            "allow": [
+                {
+                    "path": "**/*"
+                },
+                {
+                    "path": "asset://localhost/**"
+                }
+            ]
+        },
+        "fs:allow-read-file",
+        "fs:allow-exists",
+        "fs:allow-write-file",
+        "fs:allow-app-write",
+        "fs:allow-app-read",
+        "fs:allow-app-read-recursive",
+        "fs:allow-app-write-recursive",
+        "fs:allow-appconfig-write",
+        "fs:allow-appconfig-write-recursive",
+        "fs:allow-appdata-write",
+        "fs:allow-appdata-write-recursive",
+        "fs:allow-watch",
+        "fs:allow-unwatch",
+        "fs:allow-read-dir",
+        "fs:allow-copy-file",
+        "notification:default"
+    ]
+}

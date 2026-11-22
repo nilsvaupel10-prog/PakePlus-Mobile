@@ -37,7 +37,7 @@ pub fn url_encode(input: &str) -> String {
 // handle something when start app
 pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
     let args: Vec<String> = std::env::args().collect();
-    let args_str = args[1..].join("|");
+    let args_str = args.get(1..).unwrap_or(&[]).join("|");
     let args_base64 = BASE64_STANDARD.encode(args_str.as_bytes());
     let app_handle = app.handle();
     let window_json = r#"
@@ -104,9 +104,13 @@ pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
         .unwrap();
     let store = app.store(store_name).unwrap();
     // store.clear();
+    #[cfg(not(target_os = "android"))]
     let window_size: Option<serde_json::Value> = store.get("window_size");
+    #[cfg(not(target_os = "android"))]
     let mut width = 0.0;
+    #[cfg(not(target_os = "android"))]
     let mut height = 0.0;
+    #[cfg(not(target_os = "android"))]
     if let Some(window_size) = window_size {
         let size = window_size.as_object().unwrap();
         width = size["width"].as_f64().unwrap();
@@ -120,11 +124,15 @@ pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
         window.set_icon(png_image).unwrap();
     }
 
+    #[cfg(not(target_os = "android"))]
     let window_position: Option<serde_json::Value> = store.get("window_position");
+    #[cfg(not(target_os = "android"))]
     let mut x = 0.0;
+    #[cfg(not(target_os = "android"))]
     let mut y = 0.0;
 
     // println!("windows_position: {:?}", window_position);
+    #[cfg(not(target_os = "android"))]
     if let Some(window_position) = window_position {
         let position = window_position.as_object().unwrap();
         x = position["x"].as_f64().unwrap();
@@ -132,6 +140,7 @@ pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
     }
 
     // position
+    #[cfg(not(target_os = "android"))]
     if config.center || x <= 0.0 || y <= 0.0 {
         window.center().unwrap();
     } else {
@@ -140,6 +149,7 @@ pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
             .unwrap();
     }
 
+    #[cfg(not(target_os = "android"))]
     if config.fullscreen
         || store
             .get("fullscreen")
@@ -202,8 +212,11 @@ pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
             println!("drag_drop: {:?}", drag_drop);
         }
     });
-    window.unminimize().unwrap();
-    window.show().unwrap();
-    window.set_focus().unwrap();
+    #[cfg(not(target_os = "android"))]
+    {
+        window.unminimize().unwrap();
+        window.show().unwrap();
+        window.set_focus().unwrap();
+    }
     Ok(())
 }
