@@ -15,6 +15,11 @@ pub struct PreviewContext {
     /// The flag that remembers that the password of the project was entered,
     /// it is used by the `oncePwd` start method.
     pub once: Option<String>,
+    /// The number of the request the context belongs to.
+    ///
+    /// The webview answers asynchronously, an answer of an older request must
+    /// not be used for a newer preview.
+    pub request_id: u64,
 }
 
 pub struct ServerState {
@@ -34,6 +39,12 @@ pub struct ServerState {
     pub inject_js: Arc<Mutex<Option<String>>>,
     /// The project that is currently previewed, see [`PreviewContext`].
     pub preview_context: Option<PreviewContext>,
+    /// The number of the last request for the previewed project.
+    ///
+    /// It is increased for every preview, the answers of the webview carry the
+    /// number of the request they belong to, an answer of an older request is
+    /// discarded.
+    pub preview_request_id: u64,
 }
 
 impl Default for ServerState {
@@ -44,6 +55,7 @@ impl Default for ServerState {
             preview_handle: None,
             inject_js: Arc::new(Mutex::new(None)),
             preview_context: None,
+            preview_request_id: 0,
         }
     }
 }

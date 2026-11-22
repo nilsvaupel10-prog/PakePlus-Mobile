@@ -124,6 +124,11 @@ project that is previewed is handed over to the backend before the preview is
 opened (`preview_context` command) and written into the storage of the served
 page. The password page needs it to know the password settings of the project.
 
+The answer of the webview arrives asynchronously, therefore every request gets
+its own number. The backend removes the values of the previous preview and
+discards an answer that belongs to an older request, a preview never uses the
+values of another project.
+
 ### Cleartext traffic
 
 The preview and the locally packaged application are served from `127.0.0.1`,
@@ -170,11 +175,19 @@ requested when needed:
 ```rust
 match app.notification().permission_state() {
     Ok(PermissionState::Granted) => {}
-    Ok(_) => { let _ = app.notification().request_permission(); }
-    Err(_) => {}
+    Ok(_) => {
+        // the request waits for the answer of the user
+        if !matches!(app.notification().request_permission(), Ok(PermissionState::Granted)) {
+            return Err("The permission to send notifications was not granted.".into());
+        }
+    }
+    Err(e) => return Err(e.to_string()),
 }
 app.notification().builder().title(title).body(body).show()?;
 ```
+
+The request of the permission blocks until the user has answered, therefore the
+command runs it on a blocking task of the asynchronous runtime.
 
 `POST_NOTIFICATIONS` is contributed by the plugin itself, so no additional
 `<uses-permission>` entry is required in `AndroidManifest.xml`.

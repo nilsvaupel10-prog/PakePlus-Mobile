@@ -275,18 +275,30 @@ enum PreviewTarget {
 /// The frontend keeps the project in the storage of the webview, a page that is
 /// opened by the system browser cannot read that storage. The webview sends
 /// the project to the backend, the backend writes it into the pages it serves.
+///
+/// The answer carries the number of the request it belongs to, an answer of an
+/// older request is discarded, a preview that is started while another one is
+/// still waiting must not use the values of the older project.
 #[tauri::command]
 pub fn preview_context(
     state: tauri::State<'_, Arc<Mutex<ServerState>>>,
     project: Option<String>,
     preview_type: Option<String>,
     once: Option<String>,
+    request_id: Option<u64>,
 ) {
     let mut state = state.lock().unwrap();
+    if let Some(request_id) = request_id {
+        if request_id != state.preview_request_id {
+            // The answer belongs to a preview that was superseded in the meantime.
+            return;
+        }
+    }
     state.preview_context = Some(PreviewContext {
         project,
         preview_type,
         once,
+        request_id: request_id.unwrap_or(state.preview_request_id),
     });
 }
 
@@ -295,21 +307,39 @@ pub fn preview_context(
 /// The answer arrives asynchronously through the `preview_context` command, the
 /// function waits a short moment for it. The preview is opened even when the
 /// answer does not arrive, the page then falls back to its default values.
+///
+/// Every request has its own number, the answer of an older request is
+/// discarded. The context of the previous preview is removed as well, a preview
+/// must never use the values of an older project.
 #[cfg(mobile)]
 async fn request_preview_context(
     handle: &AppHandle,
     state: &tauri::State<'_, Arc<Mutex<ServerState>>>,
 ) {
-    const SCRIPT: &str = "window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke('preview_context', {project: localStorage.getItem('currentProject'), previewType: localStorage.getItem('previewType'), once: (function(){try{var p=JSON.parse(localStorage.getItem('currentProject')||'{}');return p.appid?localStorage.getItem(p.appid):null}catch(e){return null}})()}).catch(function(){})";
+    const SCRIPT: &str = "window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke('preview_context', {requestId: {request_id}, project: localStorage.getItem('currentProject'), previewType: localStorage.getItem('previewType'), once: (function(){try{var p=JSON.parse(localStorage.getItem('currentProject')||'{}');return p.appid?localStorage.getItem(p.appid):null}catch(e){return null}})()}).catch(function(){})";
     let window = match handle.get_webview_window("main") {
         Some(window) => window,
         None => return,
     };
-    if window.eval(SCRIPT).is_err() {
+    let request_id = {
+        let mut state = state.lock().unwrap();
+        state.preview_request_id += 1;
+        // The values of the previous preview are not valid anymore.
+        state.preview_context = None;
+        state.preview_request_id
+    };
+    let script = SCRIPT.replace("{request_id}", &request_id.to_string());
+    if window.eval(&script).is_err() {
         return;
     }
     for _ in 0..40 {
-        let answered = state.lock().unwrap().preview_context.is_some();
+        let answered = state
+            .lock()
+            .unwrap()
+            .preview_context
+            .as_ref()
+            .map(|context| context.request_id == request_id)
+            .unwrap_or(false);
         if answered {
             return;
         }
@@ -415,7 +445,8 @@ fn serve_application_page(
     let mut content = String::from_utf8_lossy(&asset.bytes).to_string();
     // The page reads the project from its storage, the storage of the browser
     // is not shared with the storage of the application.
-    if let Some(context) = state.lock().unwrap().preview_context.clone() {
+    let context = state.lock().unwrap().preview_context.clone();
+    if let Some(context) = context {
         content = inject_preview_context(&content, &context);
     }
     let dir = crate::utils::mobile::app_data_dir(handle)?.join("preview");
@@ -730,20 +761,34 @@ pub async fn notification(app: AppHandle, params: NotificationParams) -> Result<
     }
     #[cfg(mobile)]
     {
-        // Android 13 and above require the POST_NOTIFICATIONS runtime permission.
-        match app.notification().permission_state() {
-            Ok(PermissionState::Granted) => {}
-            Ok(_) => {
-                let _ = app.notification().request_permission();
+        // The request of the permission waits for the answer of the user, it
+        // must not block a worker of the asynchronous runtime.
+        let app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            // Android 13 and above require the POST_NOTIFICATIONS runtime permission.
+            match app.notification().permission_state() {
+                Ok(PermissionState::Granted) => {}
+                Ok(_) => {
+                    // The request waits for the answer of the user, the
+                    // notification is only shown when the permission is granted.
+                    if !matches!(
+                        app.notification().request_permission(),
+                        Ok(PermissionState::Granted)
+                    ) {
+                        return Err("The permission to send notifications was not granted.".into());
+                    }
+                }
+                Err(e) => return Err(e.to_string()),
             }
-            Err(_) => {}
-        }
-        app.notification()
-            .builder()
-            .title(params.title)
-            .body(params.body)
-            .show()
-            .map_err(|e| e.to_string())
+            app.notification()
+                .builder()
+                .title(params.title)
+                .body(params.body)
+                .show()
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()))
     }
 }
 
