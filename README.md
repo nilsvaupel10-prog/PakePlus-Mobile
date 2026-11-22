@@ -186,8 +186,10 @@ pnpm tauri android build --ci --aab
 ```
 
 Building for Android requires JDK 17, the Android SDK (platform `android-36`)
-and the NDK `29.0.13846066`. The full documentation, including the differences
-between the desktop and the mobile implementation, is available in
+and the NDK `29.0.13846066`. The same steps are available as the script
+`scripts/build-android.sh` and are executed by the workflow
+`.github/workflows/android.yml`. The full documentation, including the
+differences between the desktop and the mobile implementation, is available in
 [docs/guide/android.md](docs/guide/android.md).
 
 ## Support
