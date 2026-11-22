@@ -9,7 +9,7 @@
     "single": true,
     "injectJq": false,
     "tauriApi": false,
-    "devbug": true,
+    "devbug": false,
     "version": "0.0.1",
     "preview": "phone",
     "platform": [
@@ -35,7 +35,7 @@
             "resizable": true,
             "fullscreen": false,
             "maximized": false,
-            "devtools": true
+            "devtools": false
         }
     },
     "phone": {
@@ -86,7 +86,7 @@
         "desc": "",
         "pubBody": "Package for personal use only, please do not use for commercial purposes.",
         "isHtml": false,
-        "debug": true
+        "debug": false
     },
     "android": {
         "name": "githubplus",
@@ -103,7 +103,7 @@
         "desc": "",
         "pubBody": "Package for personal use only, please do not use for commercial purposes.",
         "isHtml": false,
-        "debug": true
+        "debug": false
     },
     "desktop": {
         "name": "githubplus",
@@ -120,6 +120,6 @@
         "injectJq": false,
         "tauriApi": false,
         "buildMethod": "cloud",
-        "debug": true
+        "debug": false
     }
 }
