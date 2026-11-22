@@ -1,5 +1,6 @@
 use crate::command::model::ServerState;
 use base64::prelude::*;
+#[cfg(not(target_os = "android"))]
 use notify_rust::Notification;
 use serde::Serialize;
 use std::env;
@@ -147,7 +148,7 @@ pub async fn preview_from_config(
                 BASE64_STANDARD.decode(icon_base64.replace("data:image/png;base64,", "").trim());
             let icon_bytes = icon_decode.unwrap();
             let png_image = Image::from_bytes(&icon_bytes).unwrap();
-            pre_window.set_icon(png_image).unwrap();
+            let _ = pre_window.set_icon(png_image);
         }
         if devbug {
             pre_window.open_devtools();
@@ -161,8 +162,9 @@ pub async fn preview_from_config(
 }
 
 #[tauri::command]
-pub async fn open_url(_: tauri::AppHandle, url: String) {
-    open::that(url).unwrap();
+pub async fn open_url(app: tauri::AppHandle, url: String) {
+    use tauri_plugin_opener::OpenerExt;
+    let _ = app.opener().open_url(url, None::<&str>);
 }
 
 // open devtools
@@ -236,10 +238,32 @@ pub async fn run_command(command: String) -> Result<String, String> {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn get_machine_uid() -> String {
     let uid: String = machine_uid::get().unwrap();
     uid
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+pub fn get_machine_uid() -> String {
+    let path = std::env::temp_dir().join("pakeplus-machine-uid");
+    if let Ok(id) = std::fs::read_to_string(&path) {
+        if !id.trim().is_empty() {
+            return id;
+        }
+    }
+    let id = format!(
+        "{:x}-{:x}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+        std::process::id()
+    );
+    let _ = std::fs::write(&path, &id);
+    id
 }
 
 fn zip_folder(src_path: &str, dst_path: &str) -> std::io::Result<()> {
@@ -327,11 +351,16 @@ pub async fn download_file(
     let mut save_path = save_path;
     let file_name = url.split('/').last().unwrap();
     if save_path.is_empty() {
-        let file_path = app
+        save_path = app
             .path()
             .resolve(file_name, BaseDirectory::Download)
-            .expect("failed to resolve resource");
-        save_path = file_path.to_str().unwrap().to_string();
+            .map(|p| p.to_str().unwrap_or_default().to_string())
+            .unwrap_or_else(|_| {
+                std::env::temp_dir()
+                    .join(file_name)
+                    .to_string_lossy()
+                    .to_string()
+            });
     }
     // if file exists, add number to file name
     if Path::new(&save_path).exists() {
@@ -371,6 +400,19 @@ pub struct NotificationParams {
     icon: String,
 }
 
+#[cfg(target_os = "android")]
+#[tauri::command]
+pub fn notification(app: AppHandle, params: NotificationParams) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+    app.notification()
+        .builder()
+        .title(params.title)
+        .body(params.body)
+        .show()
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn notification(app: AppHandle, params: NotificationParams) -> Result<(), String> {
     let mut notifi_app = Notification::new();

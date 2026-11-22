@@ -2,9 +2,18 @@
     "$schema": "../gen/schemas/desktop-schema.json",
     "identifier": "default",
     "description": "Capability for the main window",
-    "windows": ["main", "PreView", "*"],
+    "windows": [
+        "main",
+        "PreView",
+        "*"
+    ],
     "remote": {
-        "urls": ["https://*:*", "file://*", "http://*:*", "asset://localhost/*"]
+        "urls": [
+            "https://*:*",
+            "file://*",
+            "http://*:*",
+            "asset://localhost/*"
+        ]
     },
     "permissions": [
         "core:default",
@@ -134,5 +143,10 @@
         "fs:allow-unwatch",
         "fs:allow-read-dir",
         "fs:allow-copy-file"
+    ],
+    "platforms": [
+        "macOS",
+        "windows",
+        "linux"
     ]
 }

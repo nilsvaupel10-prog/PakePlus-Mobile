@@ -2,43 +2,48 @@ mod command;
 use std::sync::{Arc, Mutex};
 mod utils;
 use command::model::ServerState;
+#[cfg(target_os = "macos")]
 use tauri::menu::*;
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .manage(Arc::new(Mutex::new(ServerState {
-            server_handle: None,
-        })))
-        .menu(|handle| {
-            let menu = Menu::with_items(
+    let builder = tauri::Builder::default().manage(Arc::new(Mutex::new(ServerState {
+        server_handle: None,
+    })));
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(|handle| {
+        let menu = Menu::with_items(
+            handle,
+            &[&Submenu::with_items(
                 handle,
+                "Edit",
+                true,
                 &[
-                    #[cfg(target_os = "macos")]
-                    &Submenu::with_items(
-                        handle,
-                        "Edit",
-                        true,
-                        &[
-                            &PredefinedMenuItem::undo(handle, None)?,
-                            &PredefinedMenuItem::redo(handle, None)?,
-                            &PredefinedMenuItem::cut(handle, None)?,
-                            &PredefinedMenuItem::copy(handle, None)?,
-                            &PredefinedMenuItem::paste(handle, None)?,
-                            &PredefinedMenuItem::select_all(handle, None)?,
-                        ],
-                    )?,
+                    &PredefinedMenuItem::undo(handle, None)?,
+                    &PredefinedMenuItem::redo(handle, None)?,
+                    &PredefinedMenuItem::cut(handle, None)?,
+                    &PredefinedMenuItem::copy(handle, None)?,
+                    &PredefinedMenuItem::paste(handle, None)?,
+                    &PredefinedMenuItem::select_all(handle, None)?,
                 ],
-            );
-            menu
-        })
+            )?],
+        );
+        menu
+    });
+    let builder = builder
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::default().build());
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_notification::init());
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    builder
         .invoke_handler(tauri::generate_handler![
             command::cmds::preview_from_config,
             command::cmds::open_url,
