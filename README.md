@@ -142,7 +142,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/YourAppName.app
 
 ## Custom Development
 
-If you want to Contribution PacBao, ensure your environment is prepared beforehand. Make sure Rust `>=1.63` and Node `>=16` (e.g., `16.18.1`) are installed on your computer. For installation guidance, please refer to the [Tauri Documentation](https://tauri.app/v1/guides/getting-started/prerequisites).
+If you want to Contribution PacBao, ensure your environment is prepared beforehand. Make sure Rust `>=1.77.2` and Node `>=20` (e.g., `20.x`) as well as `pnpm` are installed on your computer. For installation guidance, please refer to the [Tauri Documentation](https://v2.tauri.app/start/prerequisites/). The Android build additionally needs JDK 17, the Android SDK and the Android NDK, see the [Android guide](docs/guide/android.md).
 
 If you’re unfamiliar with these, it’s best to try the one-click packaging tool above.
 
@@ -159,6 +159,36 @@ pnpm run build
 ```
 
 All work is conducted openly on GitHub. Whether you are a core team member or an external contributor, all Pull Requests must go through the same review process.
+
+## Android
+
+PakePlus can also be built as an Android application. The Android project is a
+standard Tauri v2 mobile project that lives in `src-tauri/gen/android` and is
+committed to the repository, so it can be opened with Android Studio or built
+from the command line.
+
+```sh
+# Install dependencies
+pnpm i
+
+# Install the Android Rust targets
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+# Generate the Gradle project (optional, the result is committed)
+pnpm tauri android init --ci --skip-targets-install
+
+# Build a debug APK
+pnpm tauri android build --ci --debug --apk
+
+# Build a release APK / App Bundle
+pnpm tauri android build --ci --apk
+pnpm tauri android build --ci --aab
+```
+
+Building for Android requires JDK 17, the Android SDK (platform `android-36`)
+and the NDK `29.0.13846066`. The full documentation, including the differences
+between the desktop and the mobile implementation, is available in
+[docs/guide/android.md](docs/guide/android.md).
 
 ## Support
 

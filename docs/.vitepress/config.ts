@@ -84,6 +84,10 @@ export default defineConfig({
                                     text: 'Build and Release',
                                     link: '/guide/build',
                                 },
+                                {
+                                    text: 'Android Build',
+                                    link: '/guide/android',
+                                },
                             ],
                         },
                         {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    PakePlus serves the preview and the locally packaged application from
+    `127.0.0.1`, that traffic is plain HTTP and therefore has to be allowed
+    explicitly. Every other destination keeps the default of the platform,
+    cleartext traffic is not permitted.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

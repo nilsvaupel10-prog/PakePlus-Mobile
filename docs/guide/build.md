@@ -5,7 +5,7 @@ description: Compile and release your cross-platform desktop application using P
 
 # Compilation and Release
 
-This step instructs GitHub to compile your project into a cross-platform desktop application. Currently, PakePlus only supports desktop platforms (mobile support coming soon). You can choose between two release modes:
+This step instructs GitHub to compile your project into a cross-platform desktop application. The cloud build produces a desktop application, an Android package (`.apk`) and an iOS package (`.ipa`) when the mobile configuration of the project is filled in, see the [Mobile App Configuration](/guide/phone) and the [Android Build](/guide/android) guide. You can choose between two release modes:
 
 1. **Release Mode (Debug Disabled)** - For production use
 2. **Debug Mode** - Enables error logging in console when the app launches
