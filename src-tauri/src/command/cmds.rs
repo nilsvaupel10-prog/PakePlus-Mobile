@@ -46,6 +46,15 @@ use tauri::WebviewUrl;
 /// rendered by the system browser instead of a second webview window.
 const PREVIEW_ROUTE: &str = "__pakeplus_preview.html";
 
+/// Stub of the Tauri api for a page that is opened by the system browser.
+///
+/// The preview script of PakePlus reads the event api of Tauri, a browser tab
+/// does not have it. Without the stub the script stops at its first line and
+/// the custom JavaScript of the project is not evaluated.
+#[cfg(mobile)]
+const TAURI_STUB: &str =
+    "<script>window.__TAURI__=window.__TAURI__||{event:{listen:function(){}}};</script>";
+
 #[tauri::command]
 pub async fn start_server(
     app: AppHandle,
@@ -104,7 +113,11 @@ pub async fn start_server(
                     let entry = Path::new(&root).join("index.html");
                     match fs::read_to_string(&entry) {
                         Ok(html) => {
-                            let tag = format!("<script>{}</script>", script);
+                            #[cfg(mobile)]
+                            let script = format!("{TAURI_STUB}<script>{script}</script>");
+                            #[cfg(not(mobile))]
+                            let script = format!("<script>{script}</script>");
+                            let tag = script;
                             let html = if html.contains("</body>") {
                                 html.replace("</body>", format!("{tag}</body>"))
                             } else {
@@ -371,24 +384,7 @@ fn inject_preview_context(html: &str, context: &PreviewContext) -> String {
     let script = format!(
         "<script>try{{localStorage.setItem('currentProject',{project});localStorage.setItem('previewType',{preview_type});{once}}}catch(e){{}}</script>"
     );
-    insert_into_head(html, &script)
-}
-
-/// Inserts a script into the head of an HTML document.
-#[cfg(mobile)]
-fn insert_into_head(html: &str, script: &str) -> String {
-    let head = match html.find("<head") {
-        Some(index) => match html[index..].find('>') {
-            Some(offset) => index + offset + 1,
-            None => return format!("{script}{html}"),
-        },
-        None => 0,
-    };
-    let mut result = String::with_capacity(html.len() + script.len());
-    result.push_str(&html[..head]);
-    result.push_str(script);
-    result.push_str(&html[head..]);
-    result
+    crate::utils::mobile::insert_into_head(html, &script)
 }
 
 /// Determines where the preview of a project has to be opened.
@@ -1191,11 +1187,18 @@ pub async fn build_local(
                 crate::utils::mobile::copy_dir(html_dir, &www_dir)?;
             }
         }
-        fs::write(inject_dir.join("custom.js"), custom_js).map_err(|e| e.to_string())?;
+        fs::write(inject_dir.join("custom.js"), custom_js.clone()).map_err(|e| e.to_string())?;
         fs::write(base.join("man"), man_json_base64).map_err(|e| e.to_string())?;
         handle
             .emit("local-progress", "80")
             .map_err(|e| e.to_string())?;
+
+        // The desktop build injects the custom javascript into the window of
+        // the packaged application. A browser tab has no initialization
+        // script, therefore the script is written into the pages of the
+        // project.
+        let script = format!("{TAURI_STUB}<script>{}</script>", custom_js);
+        crate::utils::mobile::inject_script(&www_dir, &script)?;
 
         // Run the packaged application and show it in the system browser.
         let port = crate::utils::mobile::serve_dir(&state, www_dir)?;

@@ -129,3 +129,49 @@ pub fn copy_dir(source: &Path, destination: &Path) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Inserts a script into the head of an HTML document.
+pub fn insert_into_head(html: &str, script: &str) -> String {
+    let head = match html.find("<head") {
+        Some(index) => match html[index..].find('>') {
+            Some(offset) => index + offset + 1,
+            None => return format!("{script}{html}"),
+        },
+        None => 0,
+    };
+    let mut result = String::with_capacity(html.len() + script.len());
+    result.push_str(&html[..head]);
+    result.push_str(script);
+    result.push_str(&html[head..]);
+    result
+}
+
+/// Writes a script into every HTML file of a directory.
+///
+/// A browser tab cannot be initialised with a script, the desktop build uses
+/// the initialization script of the webview instead. Every page of the
+/// directory is prepared, the project may consist of more than one page.
+pub fn inject_script(dir: &Path, script: &str) -> Result<(), String> {
+    let entries = fs::read_dir(dir)
+        .map_err(|e| format!("failed to read {}: {e}", dir.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("failed to read a directory entry: {e}"))?;
+        let path = entry.path();
+        if path.is_dir() {
+            inject_script(&path, script)?;
+            continue;
+        }
+        let is_html = path
+            .extension()
+            .map(|extension| extension.eq_ignore_ascii_case("html"))
+            .unwrap_or(false);
+        if !is_html {
+            continue;
+        }
+        let html = fs::read_to_string(&path)
+            .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+        let html = insert_into_head(&html, script);
+        fs::write(&path, html).map_err(|e| format!("failed to write {}: {e}", path.display()))?;
+    }
+    Ok(())
+}

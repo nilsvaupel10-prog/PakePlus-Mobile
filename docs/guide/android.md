@@ -140,6 +140,12 @@ its own number. The backend removes the values of the previous preview and
 discards an answer that belongs to an older request, a preview never uses the
 values of another project.
 
+A browser tab has neither an initialization script nor the api of Tauri. The
+custom JavaScript is therefore written into the page and a small stub replaces
+the event api of Tauri, the preview script of PakePlus needs it. Custom
+JavaScript that uses more of the api of Tauri does not work in the preview of
+a phone.
+
 ### Cleartext traffic
 
 The preview and the locally packaged application are served from `127.0.0.1`,
@@ -175,6 +181,9 @@ the project is staged inside the application sandbox
 (`<app data>/packages/<name>`), served from `127.0.0.1` and opened with the
 system browser. The desktop only installers (`rh.exe`, `sips`, `iconutil`, ...)
 are not available, so the corresponding commands return an explanatory error.
+
+The custom JavaScript of the project is written into the pages of the package,
+the desktop build injects it into the window of the packaged application.
 
 ### Notifications
 
