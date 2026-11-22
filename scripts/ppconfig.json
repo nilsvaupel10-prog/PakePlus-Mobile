@@ -9,7 +9,7 @@
     "single": true,
     "injectJq": false,
     "tauriApi": false,
-    "devbug": false,
+    "devbug": true,
     "version": "0.0.1",
     "preview": "phone",
     "platform": [
@@ -35,7 +35,7 @@
             "resizable": true,
             "fullscreen": false,
             "maximized": false,
-            "devtools": false
+            "devtools": true
         }
     },
     "phone": {
@@ -84,9 +84,9 @@
         "id": "com.slut4jesus.githubplus",
         "icon": "./app-icon.png",
         "desc": "",
-        "pubBody": "Test",
+        "pubBody": "Package for personal use only, please do not use for commercial purposes.",
         "isHtml": false,
-        "debug": false
+        "debug": true
     },
     "android": {
         "name": "githubplus",
@@ -101,9 +101,9 @@
         "copyTo": "./app/src/main/res",
         "androidResDir": "./app/src/main/res",
         "desc": "",
-        "pubBody": "Test",
+        "pubBody": "Package for personal use only, please do not use for commercial purposes.",
         "isHtml": false,
-        "debug": false
+        "debug": true
     },
     "desktop": {
         "name": "githubplus",
@@ -113,13 +113,13 @@
         "desc": "",
         "webUrl": "https://github.com",
         "iconPath": "../app-icon.png",
-        "pubBody": "Test",
+        "pubBody": "Package for personal use only, please do not use for commercial purposes.",
         "isHtml": false,
         "single": true,
         "state": true,
         "injectJq": false,
         "tauriApi": false,
         "buildMethod": "cloud",
-        "debug": false
+        "debug": true
     }
 }
