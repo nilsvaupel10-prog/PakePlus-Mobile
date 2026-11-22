@@ -1,10 +1,23 @@
+#[cfg(desktop)]
 use crate::command::cmds::{get_config_js, get_exe_dir, get_www_dir, load_man};
+#[cfg(desktop)]
 use base64::{prelude::BASE64_STANDARD, Engine};
+#[cfg(desktop)]
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Error, Value};
-use tauri::{utils::config::WindowConfig, App, Url, WebviewUrl, WindowEvent};
+use serde_json::Error;
+#[cfg(desktop)]
+use serde_json::{json, Value};
+#[cfg(desktop)]
+use tauri::utils::config::WindowConfig;
+use tauri::{App, Manager};
+#[cfg(desktop)]
+use tauri::{Url, WebviewUrl, WindowEvent};
+#[cfg(desktop)]
 use tauri_plugin_store::StoreExt;
 
+/// The configuration of a packaged project, it is only read on desktop
+/// platforms where the window of the project is created at runtime.
+#[cfg(desktop)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Man {
     pub name: String,
@@ -17,11 +30,15 @@ pub struct Man {
     pub icon: String,
 }
 
+/// Appends the arguments of the command line to an url.
+#[cfg(desktop)]
 pub fn append_param(original_url: &str, value: &str) -> String {
     let separator = if original_url.contains('?') { "&" } else { "?" };
     format!("{}{}args={}", original_url, separator, url_encode(value))
 }
 
+/// Encodes a string so that it can be used as the value of a query parameter.
+#[cfg(desktop)]
 pub fn url_encode(input: &str) -> String {
     input
         .bytes()
@@ -34,12 +51,29 @@ pub fn url_encode(input: &str) -> String {
         .collect()
 }
 
-// handle something when start app
+/// Handles the startup of the application.
+///
+/// Desktop platforms create the window themselves, mobile platforms get their
+/// window from the runtime (see `tauri.android.conf.json`) and therefore only
+/// need the window to be displayed.
 pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
+    #[cfg(desktop)]
+    {
+        resolve_setup_desktop(app).await
+    }
+    #[cfg(mobile)]
+    {
+        resolve_setup_mobile(app).await
+    }
+}
+
+/// Desktop startup: creates the main window and restores its state.
+#[cfg(desktop)]
+async fn resolve_setup_desktop(app: &mut App) -> Result<(), Error> {
     let args: Vec<String> = std::env::args().collect();
     let args_str = args[1..].join("|");
     let args_base64 = BASE64_STANDARD.encode(args_str.as_bytes());
-    let app_handle = app.handle();
+    let app_handle = app.handle().clone();
     let window_json = r#"
         {
             "title": "PakePlus",
@@ -61,7 +95,7 @@ pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
     let mut store_name = "app_data.json".to_string();
     let mut config: WindowConfig = serde_json::from_value(json_value).unwrap();
     // load man
-    let startup_dir = get_exe_dir(true);
+    let startup_dir = get_exe_dir(app_handle.clone(), true);
     let man = load_man(&startup_dir);
     let man_content = man.unwrap();
     // custom js
@@ -205,5 +239,19 @@ pub async fn resolve_setup(app: &mut App) -> Result<(), Error> {
     window.unminimize().unwrap();
     window.show().unwrap();
     window.set_focus().unwrap();
+    Ok(())
+}
+
+/// Mobile startup.
+///
+/// Android and iOS create the main window from the configuration of the
+/// application (`tauri.android.conf.json` / `tauri.ios.conf.json`), the window
+/// cannot be created or resized by the application itself.
+#[cfg(mobile)]
+async fn resolve_setup_mobile(app: &mut App) -> Result<(), Error> {
+    let app_handle = app.handle().clone();
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.show();
+    }
     Ok(())
 }

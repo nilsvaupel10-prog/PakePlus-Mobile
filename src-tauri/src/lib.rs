@@ -2,35 +2,17 @@ mod command;
 use std::sync::{Arc, Mutex};
 mod utils;
 use command::model::ServerState;
+#[cfg(desktop)]
 use tauri::menu::*;
 
+/// Entry point of the application.
+///
+/// The `mobile_entry_point` attribute is required on Android and iOS, it wires
+/// the Rust application into the native runtime of the platform.
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .manage(Arc::new(Mutex::new(ServerState {
-            server_handle: None,
-        })))
-        .menu(|handle| {
-            let menu = Menu::with_items(
-                handle,
-                &[
-                    #[cfg(target_os = "macos")]
-                    &Submenu::with_items(
-                        handle,
-                        "Edit",
-                        true,
-                        &[
-                            &PredefinedMenuItem::undo(handle, None)?,
-                            &PredefinedMenuItem::redo(handle, None)?,
-                            &PredefinedMenuItem::cut(handle, None)?,
-                            &PredefinedMenuItem::copy(handle, None)?,
-                            &PredefinedMenuItem::paste(handle, None)?,
-                            &PredefinedMenuItem::select_all(handle, None)?,
-                        ],
-                    )?,
-                ],
-            );
-            menu
-        })
+    let builder = tauri::Builder::default()
+        .manage(Arc::new(Mutex::new(ServerState::default())))
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -39,8 +21,38 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init());
+
+    // The application menu only exists on desktop platforms.
+    #[cfg(desktop)]
+    let builder = builder.menu(|handle| {
+        let menu = Menu::with_items(
+            handle,
+            &[
+                #[cfg(target_os = "macos")]
+                &Submenu::with_items(
+                    handle,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::undo(handle, None)?,
+                        &PredefinedMenuItem::redo(handle, None)?,
+                        &PredefinedMenuItem::cut(handle, None)?,
+                        &PredefinedMenuItem::copy(handle, None)?,
+                        &PredefinedMenuItem::paste(handle, None)?,
+                        &PredefinedMenuItem::select_all(handle, None)?,
+                    ],
+                )?,
+            ],
+        );
+        menu
+    });
+
+    builder
         .invoke_handler(tauri::generate_handler![
             command::cmds::preview_from_config,
+            command::cmds::preview_context,
             command::cmds::open_url,
             command::cmds::open_devtools,
             command::cmds::update_init_rs,

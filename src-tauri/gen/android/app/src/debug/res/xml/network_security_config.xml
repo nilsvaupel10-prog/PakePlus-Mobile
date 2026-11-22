@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug builds talk to a development server that is often reached through a
+    plain HTTP address, therefore cleartext traffic is permitted for every
+    destination. The release build only permits it for `127.0.0.1`.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
